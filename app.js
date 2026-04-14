@@ -71,20 +71,35 @@ async function initCalendar(date) {
 
 // 2. Load Existing Shifts from Supabase
 async function loadShiftsFromDB(year, month) {
-    const startOfMonth = `${year}-${(month + 1).toString().padStart(2, '0')}-01`;
-    const endOfMonth = `${year}-${(month + 1).toString().padStart(2, '0')}-31`;
+    // We create a search range for the entire month
+    const monthString = `${year}-${(month + 1).toString().padStart(2, '0')}`;
+    
+    console.log(`Searching database for: ${monthString}`);
 
     const { data, error } = await supabase
         .from('confirmed_shifts')
         .select('*')
-        .gte('shift_date', startOfMonth)
-        .lte('shift_date', endOfMonth);
+        .filter('shift_date', 'ilike', `${monthString}%`); // Matches any date starting with YYYY-MM
 
-    if (!error && data) {
+    if (error) {
+        console.error("Database fetch error:", error);
+        return;
+    }
+
+    if (data) {
+        console.log(`Found ${data.length} shifts in database.`);
         data.forEach(entry => {
+            // We ensure we target the ID format: shift-display-YYYY-MM-DD
             const displayEl = document.getElementById(`shift-display-${entry.shift_date}`);
             if (displayEl) {
                 displayEl.innerText = formatShiftDisplay(entry.shift_name);
+                
+                // Optional: Style based on shift type
+                if (entry.shift_name.toLowerCase().includes('overtime')) {
+                    displayEl.classList.add('text-amber-600');
+                }
+            } else {
+                console.warn(`Could not find calendar cell for date: ${entry.shift_date}`);
             }
         });
     }
