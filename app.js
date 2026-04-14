@@ -144,15 +144,25 @@ document.getElementById('fetchBtn').onclick = async () => {
     try {
         const { data, error } = await supabase.functions.invoke('get-icloud-shifts');
         if (error) throw error;
+
+        // --- NEW: Clear existing shifts for the month first to prevent "Ghost" shifts ---
+        const monthString = `${currentViewDate.getFullYear()}-${(currentViewDate.getMonth() + 1).toString().padStart(2, '0')}`;
+        await supabase
+            .from('confirmed_shifts')
+            .delete()
+            .filter('shift_date', 'ilike', `${monthString}%`);
+
         if (data && data.length > 0) {
             for (const shift of data) {
-                await saveShiftToDatabase(shift.start, shift.title);
+                const cleanDate = shift.start.split('T')[0]; 
+                await saveShiftToDatabase(cleanDate, shift.title);
             }
         }
+        
         initCalendar(currentViewDate);
-        alert('iCloud Sync Complete!');
+        alert('Sync Complete!');
     } catch (err) {
-        alert('Could not sync iCloud.');
+        alert('Sync Error');
     } finally {
         fetchBtn.innerText = 'Fetch Shifts';
     }
