@@ -20,17 +20,20 @@ const calendarEl = document.getElementById('calendar');
 const picker = document.getElementById('shiftPicker');
 const optionsGrid = document.getElementById('optionsGrid');
 
-// --- NEW: Helper to format text for display ONLY ---
+// --- Updated: Helper to format text for display ONLY ---
 function formatShiftDisplay(fullTitle) {
     if (!fullTitle || fullTitle === '-' || fullTitle === 'Off') return fullTitle;
-    if (fullTitle === 'Annual Leave') return '🌴'; // Optional: Use an icon for leave
     
-    // Check for Overtime
-    if (fullTitle.toLowerCase().includes("overtime")) return "(OT)";
+    // 1. Handle Annual Leave with a clean icon or text
+    if (fullTitle === 'Annual Leave') return 'PALM'; 
     
-    // Extract text inside brackets: "Dave Work (M)" -> "(M)"
+    // 2. Check for Overtime
+    if (fullTitle.toLowerCase().includes("overtime")) return "OT";
+    
+    // 3. Extract text inside brackets: "Dave Work (M)" -> "M"
+    // The [1] pulls the first "capture group" (the text between the brackets)
     const match = fullTitle.match(/\((.*?)\)/);
-    return match ? `(${match[1]})` : fullTitle;
+    return match ? match[1] : fullTitle;
 }
 
 // 1. Generate the Grid
