@@ -1,3 +1,17 @@
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+// This tells the app to look for the keys in the environment
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// Only initialize if the keys exist
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.error("Supabase credentials missing!");
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+
 // Shift configuration
 const SHIFTS = [
     'Dave Work (M)', 'Dave Work (A)', 'Dave Work (D1)', 
@@ -35,9 +49,28 @@ function openPicker(day) {
         const btn = document.createElement('button');
         btn.className = "bg-slate-50 border border-slate-100 py-4 px-2 rounded-xl text-xs font-bold text-slate-700 active:bg-blue-600 active:text-white transition-all";
         btn.innerText = shift;
-        btn.onclick = () => {
-            document.getElementById(`shift-display-${day}`).innerText = shift;
-            closePicker();
+        btn.onclick = async () => {
+    // 1. Update the UI immediately for that "snappy" feel
+    document.getElementById(`shift-display-${day}`).innerText = shift;
+    
+    // 2. Prepare the date string (YYYY-MM-DD)
+    const formattedDate = `2026-04-${day.toString().padStart(2, '0')}`;
+
+    // 3. Save to Supabase (UPSERT handles both new entries and updates)
+    const { error } = await supabase
+        .from('confirmed_shifts')
+        .upsert({ 
+            shift_date: formattedDate, 
+            shift_name: shift 
+        });
+
+    if (error) {
+        console.error('Error saving shift:', error);
+        alert('Failed to save to database');
+    }
+
+    closePicker();
+};
         };
         optionsGrid.appendChild(btn);
     });
