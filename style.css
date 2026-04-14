@@ -1,0 +1,28 @@
+/* Custom App Animations */
+@keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+.animate-slide-up {
+    animation: slideUp 0.3s ease-out forwards;
+}
+
+/* Hide scrollbars */
+body {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    -webkit-tap-highlight-color: transparent;
+}
+body::-webkit-scrollbar {
+    display: none;
+}
+
+.day-card {
+    transition: all 0.2s ease;
+}
+
+.day-card:active {
+    transform: scale(0.95);
+    background-color: #f1f5f9;
+}
