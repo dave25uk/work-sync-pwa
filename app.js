@@ -59,7 +59,7 @@ async function initCalendar(date) {
         dayCard.className = "day-card bg-white border border-slate-200 rounded-xl p-1.5 min-h-[85px] shadow-sm flex flex-col justify-between cursor-pointer active:scale-95 transition-all";
         dayCard.innerHTML = `
             <span class="text-[10px] font-bold text-slate-400">${i}</span>
-            <div class="text-[14px] font-black text-blue-600 text-center uppercase" id="shift-display-${dateKey}">-</div>
+			<div class="text-[15px] font-black text-center uppercase transition-colors duration-300" id="shift-display-${dateKey}">-</div>	
         `;
         dayCard.onclick = () => openPicker(year, month, i);
         calendarEl.appendChild(dayCard);
@@ -71,38 +71,39 @@ async function initCalendar(date) {
 
 // 2. Load Existing Shifts from Supabase
 async function loadShiftsFromDB(year, month) {
-    // We create a search range for the entire month
-    const monthString = `${year}-${(month + 1).toString().padStart(2, '0')}`;
+    const firstDay = `${year}-${(month + 1).toString().padStart(2, '0')}-01`;
+    // Get last day of month
+    const lastDay = `${year}-${(month + 1).toString().padStart(2, '0')}-${new Date(year, month + 1, 0).getDate()}`;
     
-    console.log(`Searching database for: ${monthString}`);
+    console.log(`Fetching range: ${firstDay} to ${lastDay}`);
 
     const { data, error } = await supabase
-        .from('confirmed_shifts')
+        .from('confirmed_shifts') // Double-check this matches your table name exactly
         .select('*')
-        .filter('shift_date', 'ilike', `${monthString}%`); // Matches any date starting with YYYY-MM
+        .gte('shift_date', firstDay)
+        .lte('shift_date', lastDay);
 
     if (error) {
-        console.error("Database fetch error:", error);
+        console.error("Database fetch error:", error.message, error.details);
         return;
     }
 
     if (data) {
-        console.log(`Found ${data.length} shifts in database.`);
+        console.log(`Successfully loaded ${data.length} shifts.`);
         data.forEach(entry => {
-            // We ensure we target the ID format: shift-display-YYYY-MM-DD
-            const displayEl = document.getElementById(`shift-display-${entry.shift_date}`);
-            if (displayEl) {
-                displayEl.innerText = formatShiftDisplay(entry.shift_name);
-                
-                // Optional: Style based on shift type
-                if (entry.shift_name.toLowerCase().includes('overtime')) {
-                    displayEl.classList.add('text-amber-600');
-                }
-            } else {
-                console.warn(`Could not find calendar cell for date: ${entry.shift_date}`);
-            }
-        });
+    const displayEl = document.getElementById(`shift-display-${entry.shift_date}`);
+    if (displayEl) {
+        const shortName = formatShiftDisplay(entry.shift_name);
+        displayEl.innerText = shortName;
+
+        // Apply colors based on the shift
+        if (shortName === 'M') displayEl.className = "text-[15px] font-black text-center text-orange-500";
+        else if (shortName === 'A') displayEl.className = "text-[15px] font-black text-center text-blue-500";
+        else if (shortName === 'N') displayEl.className = "text-[15px] font-black text-center text-purple-600";
+        else if (shortName === 'OT') displayEl.className = "text-[15px] font-black text-center text-emerald-600";
+        else if (shortName === '🌴') displayEl.className = "text-[15px] font-black text-center text-rose-500";
     }
+});
 }
 
 // 3. Picker Logic
