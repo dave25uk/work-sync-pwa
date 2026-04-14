@@ -127,4 +127,63 @@ async function saveShiftToDatabase(day, shiftName) {
     if (error) console.error("DB Save Error:", error);
 }
 
+let currentViewDate = new Date(2026, 3, 1); // Start at April 2026
+
+function initCalendar(date) {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    
+    // Update Label
+    const monthNames = ["January", "February", "March", "April", "May", "June", 
+                        "July", "August", "September", "October", "November", "December"];
+    document.getElementById('currentMonthLabel').innerText = `${monthNames[month]} ${year}`;
+
+    const firstDayOfMonth = new Date(year, month, 1).getDay(); 
+    // Adjust for Monday start (JS days are 0=Sun, 1=Mon... so we convert)
+    const startingPoint = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
+    
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    calendarEl.innerHTML = '';
+
+    // 1. Fill empty slots for previous month days
+    for (let x = 0; x < startingPoint; x++) {
+        const spacer = document.createElement('div');
+        spacer.className = "min-h-[95px]"; // match card height
+        calendarEl.appendChild(spacer);
+    }
+
+    // 2. Generate actual day cards
+    for (let i = 1; i <= daysInMonth; i++) {
+        const dayCard = document.createElement('div');
+        dayCard.className = "day-card bg-white border border-slate-200 rounded-xl p-1 min-h-[95px] shadow-sm flex flex-col justify-between cursor-pointer active:scale-95 transition-transform";
+        
+        // Prepare the unique ID for this specific date
+        const dateKey = `${year}-${(month + 1).toString().padStart(2, '0')}-${i.toString().padStart(2, '0')}`;
+        
+        dayCard.innerHTML = `
+            <span class="text-[10px] font-bold text-slate-400">${i}</span>
+            <div class="text-[15px] font-black text-blue-600 text-center uppercase" id="shift-display-${dateKey}">-</div>
+        `;
+        dayCard.onclick = () => openPicker(year, month, i);
+        calendarEl.appendChild(dayCard);
+    }
+    
+    // 3. Re-fetch from DB for the new month view
+    loadMonthFromDB(year, month);
+}
+
+// Navigation Listeners
+document.getElementById('prevMonth').onclick = () => {
+    currentViewDate.setMonth(currentViewDate.getMonth() - 1);
+    initCalendar(currentViewDate);
+};
+
+document.getElementById('nextMonth').onclick = () => {
+    currentViewDate.setMonth(currentViewDate.getMonth() + 1);
+    initCalendar(currentViewDate);
+};
+
+// Initial Load
+initCalendar(currentViewDate);
+
 document.getElementById('fetchBtn').onclick = fetchShifts;
