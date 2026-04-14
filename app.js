@@ -87,5 +87,5 @@ function closePicker() {
 // 3. Event Listeners
 document.getElementById('closePickerBtn').onclick = closePicker;
 
-// Start for April 2026
+// Start for 1st April 2026
 initCalendar(2026, 3);
