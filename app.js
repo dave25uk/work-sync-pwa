@@ -47,14 +47,19 @@ async function initCalendar(date) {
         calendarEl.appendChild(spacer);
     }
 
-    for (let i = 1; i <= daysInMonth; i++) {
-        const dayCard = document.createElement('div');
-        const dateKey = `${year}-${(month + 1).toString().padStart(2, '0')}-${i.toString().padStart(2, '0')}`;
-        dayCard.className = "day-card bg-white border border-slate-200 rounded-xl p-1.5 min-h-[85px] shadow-sm flex flex-col justify-between cursor-pointer active:scale-95 transition-all";
-        dayCard.innerHTML = `
-            <span class="text-[10px] font-bold text-slate-400">${i}</span>
-            <div class="text-[15px] font-black text-center uppercase transition-colors duration-300" id="shift-display-${dateKey}">-</div>
-        `;
+for (let i = 1; i <= daysInMonth; i++) {
+    const dayCard = document.createElement('div');
+    
+    // Construct the dateKey: Month + 1 because JS months are 0-indexed
+    const y = year;
+    const m = (month + 1).toString().padStart(2, '0');
+    const d = i.toString().padStart(2, '0');
+    const dateKey = `${y}-${m}-${d}`; 
+
+    dayCard.innerHTML = `
+        <span class="text-[10px] font-bold text-slate-400">${i}</span>
+        <div class="text-[15px] font-black text-center uppercase" id="shift-display-${dateKey}">-</div>
+    `;
         dayCard.onclick = () => openPicker(year, month, i);
         calendarEl.appendChild(dayCard);
     }
