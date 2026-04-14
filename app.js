@@ -88,3 +88,47 @@ document.getElementById('closePickerBtn').onclick = closePicker;
 
 // Start for 1st April 2026
 initCalendar(2026, 3);
+
+async function fetchShifts() {
+    const fetchBtn = document.getElementById('fetchBtn');
+    fetchBtn.innerText = 'Fetching...';
+    fetchBtn.disabled = true;
+
+    try {
+        // We will replace this URL with your actual Edge Function URL in the next step
+        const { data, error } = await supabase.functions.invoke('get-icloud-shifts');
+
+        if (error) throw error;
+
+        // Map the data to our calendar UI
+        data.forEach(shift => {
+            const dayNumber = new Date(shift.start).getDate();
+            const displayEl = document.getElementById(`shift-display-${dayNumber}`);
+            if (displayEl) {
+                displayEl.innerText = shift.title;
+                // Auto-save these to our Supabase table so the Vape app sees them
+                saveShiftToDatabase(dayNumber, shift.title);
+            }
+        });
+
+        alert('Shifts synced from iCloud!');
+    } catch (err) {
+        console.error('Fetch error:', err);
+        alert('Could not sync calendar. Check console for details.');
+    } finally {
+        fetchBtn.innerText = 'Fetch Shifts';
+        fetchBtn.disabled = false;
+    }
+}
+
+// Helper to keep the code clean
+async function saveShiftToDatabase(day, shiftName) {
+    const formattedDate = `2026-04-${day.toString().padStart(2, '0')}`;
+    await supabase.from('confirmed_shifts').upsert({ 
+        shift_date: formattedDate, 
+        shift_name: shiftName 
+    });
+}
+
+// Connect the button
+document.getElementById('fetchBtn').onclick = fetchShifts;
