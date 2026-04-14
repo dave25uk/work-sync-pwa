@@ -71,7 +71,6 @@ function openPicker(day) {
 
     closePicker();
 };
-        };
         optionsGrid.appendChild(btn);
     });
 
