@@ -36,22 +36,6 @@ function formatShiftDisplay(fullTitle) {
     return match ? match[1] : fullTitle;
 }
 
-// 1. Generate the Grid
-function initCalendar(year, month) {
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    calendarEl.innerHTML = '';
-
-    for (let i = 1; i <= daysInMonth; i++) {
-        const dayCard = document.createElement('div');
-        dayCard.className = "day-card bg-white border border-slate-200 rounded-2xl p-2 min-h-[95px] shadow-sm flex flex-col justify-between cursor-pointer active:scale-95 transition-transform";
-        dayCard.innerHTML = `
-            <span class="text-xs font-bold text-slate-400">${i}</span>
-            <div class="text-[14px] font-black text-blue-600 text-center leading-tight" id="shift-display-${i}">-</div>
-        `;
-        dayCard.onclick = () => openPicker(i);
-        calendarEl.appendChild(dayCard);
-    }
-}
 
 // 2. Shift Picker Logic
 function openPicker(day) {
