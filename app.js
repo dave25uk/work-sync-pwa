@@ -60,7 +60,7 @@ for (let i = 1; i <= daysInMonth; i++) {
         <span class="text-[10px] font-bold text-slate-400">${i}</span>
         <div class="text-[15px] font-black text-center uppercase" id="shift-display-${dateKey}">-</div>
     `;
-        dayCard.onclick = () => openPicker(year, month, i);
+	dayCard.onclick = () => openPicker(year, month, i);
         calendarEl.appendChild(dayCard);
     }
     loadShiftsFromDB(year, month);
@@ -68,8 +68,10 @@ for (let i = 1; i <= daysInMonth; i++) {
 
 // 2. Load Existing Shifts
 async function loadShiftsFromDB(year, month) {
-    const firstDay = `${year}-${(month + 1).toString().padStart(2, '0')}-01`;
-    const lastDay = `${year}-${(month + 1).toString().padStart(2, '0')}-${new Date(year, month + 1, 0).getDate()}`;
+    // Ensure we are searching for "2026-04" not "2026-03"
+    const displayMonth = (month + 1).toString().padStart(2, '0');
+    const firstDay = `${year}-${displayMonth}-01`;
+    const lastDay = `${year}-${displayMonth}-${new Date(year, month + 1, 0).getDate()}`;
     
     const { data, error } = await supabase
         .from('confirmed_shifts')
