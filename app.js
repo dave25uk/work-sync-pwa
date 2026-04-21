@@ -147,25 +147,30 @@ document.getElementById('closePickerBtn').onclick = closePicker;
 
 document.getElementById('fetchBtn').onclick = async () => {
     const fetchBtn = document.getElementById('fetchBtn');
-    fetchBtn.innerText = 'Syncing 3 Months...';
-    
+    fetchBtn.innerText = 'Syncing...';
     try {
-        // We call the function once. 
-        // (Ensure your Edge Function is set to return a wide enough range)
         const { data, error } = await supabase.functions.invoke('get-icloud-shifts');
-        
         if (error) throw error;
 
+        // 1. CLEAR existing data for the current month range to remove "Ghost" shifts
+        const year = currentViewDate.getFullYear();
+        const month = (currentViewDate.getMonth() + 1).toString().padStart(2, '0');
+        const { error: delError } = await supabase
+            .from('confirmed_shifts')
+            .delete()
+            .ilike('shift_date', `${year}-${month}-%`); // Deletes all shifts for this month
+
+        if (delError) console.error("Cleanup error:", delError);
+
+        // 2. SAVE the fresh data from iCloud
         if (data && data.length > 0) {
             for (const shift of data) {
-                const cleanDate = shift.start.split('T')[0]; 
-                await saveShiftToDatabase(cleanDate, shift.title);
+                await saveShiftToDatabase(shift.start.split('T')[0], shift.title);
             }
         }
         
-        // Refresh the current view
         initCalendar(currentViewDate);
-        alert('Sync Complete: 3 months of shifts updated.');
+        alert('Sync Complete! Ghost shifts removed.');
     } catch (err) {
         alert('Sync Error');
     } finally {
