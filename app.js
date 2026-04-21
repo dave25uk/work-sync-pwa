@@ -147,17 +147,14 @@ document.getElementById('closePickerBtn').onclick = closePicker;
 
 document.getElementById('fetchBtn').onclick = async () => {
     const fetchBtn = document.getElementById('fetchBtn');
-    fetchBtn.innerText = 'Syncing...';
+    fetchBtn.innerText = 'Syncing 3 Months...';
+    
     try {
+        // We call the function once. 
+        // (Ensure your Edge Function is set to return a wide enough range)
         const { data, error } = await supabase.functions.invoke('get-icloud-shifts');
+        
         if (error) throw error;
-
-        // --- NEW: Clear existing shifts for the month first to prevent "Ghost" shifts ---
-        const monthString = `${currentViewDate.getFullYear()}-${(currentViewDate.getMonth() + 1).toString().padStart(2, '0')}`;
-        await supabase
-            .from('confirmed_shifts')
-            .delete()
-            .filter('shift_date', 'ilike', `${monthString}%`);
 
         if (data && data.length > 0) {
             for (const shift of data) {
@@ -166,8 +163,9 @@ document.getElementById('fetchBtn').onclick = async () => {
             }
         }
         
+        // Refresh the current view
         initCalendar(currentViewDate);
-        alert('Sync Complete!');
+        alert('Sync Complete: 3 months of shifts updated.');
     } catch (err) {
         alert('Sync Error');
     } finally {
