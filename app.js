@@ -4,31 +4,17 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// --- CONFIGURATION ---
 const ANCHOR_DATE = new Date("2026-04-02T12:00:00");
-const PATTERN = [
-    "Dave Work (M)", "Dave Work (M)", "Dave Work (M)", 
-    "Dave Work (A)", "Dave Work (A)", "Dave Work (A)", 
-    null, null, null
-];
-
-const SHIFTS = [
-    'Dave Work (M)', 'Dave Work (A)', 'Dave Work (D1)', 
-    'Dave Work (D4)', 'Dave Work (A1)', 'Dave Work (A2)', 
-    'Dave Work (M1)', 'Annual Leave', 'Off'
-];
+const PATTERN = ["Dave Work (M)", "Dave Work (M)", "Dave Work (M)", "Dave Work (A)", "Dave Work (A)", "Dave Work (A)", null, null, null];
+const SHIFTS = ['Dave Work (M)', 'Dave Work (A)', 'Dave Work (D1)', 'Dave Work (D4)', 'Dave Work (A1)', 'Dave Work (A2)', 'Dave Work (M1)', 'Annual Leave', 'Off'];
 
 let currentViewDate = new Date(2026, 3, 1);
 const calendarEl = document.getElementById('calendar');
 const monthLabel = document.getElementById('currentMonthLabel');
-const picker = document.getElementById('shiftPicker');
-const optionsGrid = document.getElementById('optionsGrid');
 
-// Helper: Calculate 9-day pattern
 function getPatternShift(dateString) {
     const target = new Date(dateString + "T12:00:00");
-    const diffTime = target - ANCHOR_DATE;
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const diffDays = Math.floor((target - ANCHOR_DATE) / (1000 * 60 * 60 * 24));
     const index = ((diffDays % 9) + 9) % 9;
     return PATTERN[index];
 }
@@ -40,32 +26,24 @@ function formatShiftDisplay(fullTitle) {
     return match ? match[1] : fullTitle;
 }
 
-// 1. Initialize Calendar
 async function initCalendar(date) {
     const year = date.getFullYear();
     const month = date.getMonth();
-    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    monthLabel.innerText = `${monthNames[month]} ${year}`;
+    monthLabel.innerText = `${new Intl.DateTimeFormat('en-US', { month: 'long' }).format(date)} ${year}`;
 
     const firstDay = new Date(year, month, 1).getDay(); 
     const startingPoint = firstDay === 0 ? 6 : firstDay - 1; 
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     
     calendarEl.innerHTML = '';
-    for (let x = 0; x < startingPoint; x++) {
-        calendarEl.appendChild(document.createElement('div'));
-    }
+    for (let x = 0; x < startingPoint; x++) calendarEl.appendChild(document.createElement('div'));
 
     for (let i = 1; i <= daysInMonth; i++) {
-        // STRICT DATE FORMATTING: YYYY-MM-DD
-        const d = i.toString().padStart(2, '0');
-        const m = (month + 1).toString().padStart(2, '0');
-        const dateKey = `${year}-${m}-${d}`; 
-        
+        const dateKey = `${year}-${(month + 1).toString().padStart(2, '0')}-${i.toString().padStart(2, '0')}`;
         const patternShift = getPatternShift(dateKey);
         
         const dayCard = document.createElement('div');
-        dayCard.className = "day-card bg-white border border-slate-200 rounded-xl p-1.5 min-h-[85px] flex flex-col justify-between cursor-pointer active:bg-slate-50";
+        dayCard.className = "day-card bg-white border border-slate-200 rounded-xl p-1.5 min-h-[85px] flex flex-col justify-between cursor-pointer";
         dayCard.innerHTML = `
             <span class="text-[10px] font-bold text-slate-400">${i}</span>
             <div class="text-[15px] font-black text-center uppercase opacity-30" id="shift-display-${dateKey}">
@@ -75,17 +53,12 @@ async function initCalendar(date) {
         dayCard.onclick = () => openPicker(year, month, i);
         calendarEl.appendChild(dayCard);
     }
-    // Small delay to ensure DOM is ready before we paint overrides
-    setTimeout(() => loadOverrides(year, month), 50);
+    await loadOverrides(year, month);
 }
 
-// 2. Load Overrides
 async function loadOverrides(year, month) {
     const m = (month + 1).toString().padStart(2, '0');
-    const { data } = await supabase
-        .from('shift_overrides')
-        .select('*')
-        .ilike('shift_date', `${year}-${m}-%`);
+    const { data, error } = await supabase.from('shift_overrides').select('*').ilike('shift_date', `${year}-${m}-%`);
 
     if (data) {
         data.forEach(entry => {
@@ -93,19 +66,25 @@ async function loadOverrides(year, month) {
             if (el) {
                 const isOff = entry.shift_name === 'Off';
                 el.innerText = formatShiftDisplay(entry.shift_name);
-                
-                // If it's an override, make it solid. If it's "Off", make it a dash.
                 el.classList.remove('opacity-30');
                 el.classList.add(isOff ? 'text-slate-300' : 'text-blue-600');
+                console.log(`Loaded override for ${entry.shift_date}: ${entry.shift_name}`);
             }
         });
     }
 }
 
-// 3. Picker Logic
+async function saveOverride(dateKey, shiftName) {
+    // ALWAYS upsert so "Off" is recorded and doesn't revert to pattern
+    const { error } = await supabase.from('shift_overrides').upsert({ shift_date: dateKey, shift_name: shiftName });
+    if (error) console.error("Database Error:", error);
+    await initCalendar(currentViewDate);
+}
+
 function openPicker(year, month, day) {
-    const formattedDate = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    const dateKey = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
     document.getElementById('selectedDateLabel').innerText = `Shift for ${day}/${month + 1}/${year}`;
+    const optionsGrid = document.getElementById('optionsGrid');
     optionsGrid.innerHTML = '';
 
     SHIFTS.forEach(shift => {
@@ -113,72 +92,27 @@ function openPicker(year, month, day) {
         btn.className = "bg-slate-50 border border-slate-100 py-4 px-2 rounded-xl text-[10px] font-bold text-slate-700 active:bg-blue-600 active:text-white transition-all";
         btn.innerText = shift;
         btn.onclick = async () => {
-            await saveOverride(formattedDate, shift);
-            closePicker();
+            await saveOverride(dateKey, shift);
+            document.getElementById('shiftPicker').classList.add('hidden');
         };
         optionsGrid.appendChild(btn);
     });
-    picker.classList.remove('hidden');
-    picker.classList.add('flex');
+    document.getElementById('shiftPicker').classList.remove('hidden');
+    document.getElementById('shiftPicker').classList.add('flex');
 }
 
-function closePicker() {
-    picker.classList.add('hidden');
-    picker.classList.remove('flex');
-}
-
-// 4. Save Overrides
-async function saveOverride(dateKey, shiftName) {
-    try {
-        // Change: We always upsert, even if it's "Off"
-        // This ensures the database has a record that says "this day is specifically empty"
-        await supabase.from('shift_overrides').upsert({ 
-            shift_date: dateKey, 
-            shift_name: shiftName 
-        });
-
-        await initCalendar(currentViewDate);
-    } catch (err) {
-        console.error("Save Error:", err);
-    }
-}
-
-// 5. Navigation
-document.getElementById('prevMonth').onclick = () => {
-    currentViewDate.setMonth(currentViewDate.getMonth() - 1);
-    initCalendar(currentViewDate);
-};
-
-document.getElementById('nextMonth').onclick = () => {
-    currentViewDate.setMonth(currentViewDate.getMonth() + 1);
-    initCalendar(currentViewDate);
-};
-
-document.getElementById('closePickerBtn').onclick = closePicker;
+document.getElementById('prevMonth').onclick = () => { currentViewDate.setMonth(currentViewDate.getMonth() - 1); initCalendar(currentViewDate); };
+document.getElementById('nextMonth').onclick = () => { currentViewDate.setMonth(currentViewDate.getMonth() + 1); initCalendar(currentViewDate); };
+document.getElementById('closePickerBtn').onclick = () => document.getElementById('shiftPicker').classList.add('hidden');
 
 document.getElementById('fetchBtn').onclick = async () => {
-    const fetchBtn = document.getElementById('fetchBtn');
-    const originalText = fetchBtn.innerText;
-    fetchBtn.innerText = 'Syncing iCloud...';
-    fetchBtn.disabled = true;
-
+    const btn = document.getElementById('fetchBtn');
+    btn.innerText = 'Syncing...';
     try {
-        const { data, error } = await supabase.functions.invoke('sync-to-icloud', {
-            body: { 
-                year: currentViewDate.getFullYear(), 
-                month: currentViewDate.getMonth() 
-            }
-        });
-
-        if (error) throw error;
-        alert('iCloud Updated Successfully!');
-    } catch (err) {
-        console.error("Sync Error:", err);
-        alert('Sync failed. Check Supabase logs.');
-    } finally {
-        fetchBtn.innerText = originalText;
-        fetchBtn.disabled = false;
-    }
+        await supabase.functions.invoke('sync-to-icloud', { body: { year: currentViewDate.getFullYear(), month: currentViewDate.getMonth() } });
+        alert('iCloud Sync Request Sent!');
+    } catch (e) { alert('Sync Error'); }
+    btn.innerText = 'Sync to iCloud';
 };
 
 initCalendar(currentViewDate);
