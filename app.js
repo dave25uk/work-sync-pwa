@@ -57,7 +57,11 @@ async function initCalendar(date) {
     }
 
     for (let i = 1; i <= daysInMonth; i++) {
-        const dateKey = `${year}-${(month + 1).toString().padStart(2, '0')}-${i.toString().padStart(2, '0')}`;
+        // STRICT DATE FORMATTING: YYYY-MM-DD
+        const d = i.toString().padStart(2, '0');
+        const m = (month + 1).toString().padStart(2, '0');
+        const dateKey = `${year}-${m}-${d}`; 
+        
         const patternShift = getPatternShift(dateKey);
         
         const dayCard = document.createElement('div');
@@ -71,27 +75,28 @@ async function initCalendar(date) {
         dayCard.onclick = () => openPicker(year, month, i);
         calendarEl.appendChild(dayCard);
     }
-    // Pull overrides from DB after drawing the pattern
-    await loadOverrides(year, month);
+    // Small delay to ensure DOM is ready before we paint overrides
+    setTimeout(() => loadOverrides(year, month), 50);
 }
 
 // 2. Load Overrides
 async function loadOverrides(year, month) {
-    const displayMonth = (month + 1).toString().padStart(2, '0');
-    const { data, error } = await supabase
+    const m = (month + 1).toString().padStart(2, '0');
+    const { data } = await supabase
         .from('shift_overrides')
         .select('*')
-        .ilike('shift_date', `${year}-${displayMonth}-%`);
-
-    if (error) console.error("Load Overrides Error:", error);
+        .ilike('shift_date', `${year}-${m}-%`);
 
     if (data) {
         data.forEach(entry => {
             const el = document.getElementById(`shift-display-${entry.shift_date}`);
             if (el) {
+                const isOff = entry.shift_name === 'Off';
                 el.innerText = formatShiftDisplay(entry.shift_name);
-                el.classList.remove('opacity-30'); 
-                el.classList.add('text-blue-600'); 
+                
+                // If it's an override, make it solid. If it's "Off", make it a dash.
+                el.classList.remove('opacity-30');
+                el.classList.add(isOff ? 'text-slate-300' : 'text-blue-600');
             }
         });
     }
@@ -125,12 +130,13 @@ function closePicker() {
 // 4. Save Overrides
 async function saveOverride(dateKey, shiftName) {
     try {
-        if (shiftName === 'Off') {
-            await supabase.from('shift_overrides').delete().eq('shift_date', dateKey);
-        } else {
-            await supabase.from('shift_overrides').upsert({ shift_date: dateKey, shift_name: shiftName });
-        }
-        // Force a re-init to refresh the display
+        // Change: We always upsert, even if it's "Off"
+        // This ensures the database has a record that says "this day is specifically empty"
+        await supabase.from('shift_overrides').upsert({ 
+            shift_date: dateKey, 
+            shift_name: shiftName 
+        });
+
         await initCalendar(currentViewDate);
     } catch (err) {
         console.error("Save Error:", err);
