@@ -18,9 +18,12 @@ const SHIFTS = [
     'Dave Work (M1)', 'Annual Leave', 'Off'
 ];
 
+// State
 let currentViewDate = new Date(2026, 3, 1);
 const calendarEl = document.getElementById('calendar');
 const monthLabel = document.getElementById('currentMonthLabel');
+const picker = document.getElementById('shiftPicker');
+const optionsGrid = document.getElementById('optionsGrid');
 
 // Helper: Calculate 9-day pattern
 function getPatternShift(dateString) {
@@ -59,7 +62,7 @@ async function initCalendar(date) {
         const patternShift = getPatternShift(dateKey);
         
         const dayCard = document.createElement('div');
-        dayCard.className = "day-card bg-white border border-slate-200 rounded-xl p-1.5 min-h-[85px] flex flex-col justify-between cursor-pointer";
+        dayCard.className = "day-card bg-white border border-slate-200 rounded-xl p-1.5 min-h-[85px] flex flex-col justify-between cursor-pointer active:bg-slate-50";
         dayCard.innerHTML = `
             <span class="text-[10px] font-bold text-slate-400">${i}</span>
             <div class="text-[15px] font-black text-center uppercase opacity-30" id="shift-display-${dateKey}">
@@ -85,14 +88,39 @@ async function loadOverrides(year, month) {
             const el = document.getElementById(`shift-display-${entry.shift_date}`);
             if (el) {
                 el.innerText = formatShiftDisplay(entry.shift_name);
-                el.classList.remove('opacity-30'); // Make manual entries solid
+                el.classList.remove('opacity-30'); 
                 el.classList.add('text-blue-600'); 
             }
         });
     }
 }
 
-// 3. Save Overrides
+// 3. Picker Logic
+function openPicker(year, month, day) {
+    const formattedDate = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    document.getElementById('selectedDateLabel').innerText = `Shift for ${day}/${month + 1}/${year}`;
+    optionsGrid.innerHTML = '';
+
+    SHIFTS.forEach(shift => {
+        const btn = document.createElement('button');
+        btn.className = "bg-slate-50 border border-slate-100 py-4 px-2 rounded-xl text-[10px] font-bold text-slate-700 active:bg-blue-600 active:text-white transition-all";
+        btn.innerText = shift;
+        btn.onclick = async () => {
+            await saveOverride(formattedDate, shift);
+            closePicker();
+        };
+        optionsGrid.appendChild(btn);
+    });
+    picker.classList.remove('hidden');
+    picker.classList.add('flex');
+}
+
+function closePicker() {
+    picker.classList.add('hidden');
+    picker.classList.remove('flex');
+}
+
+// 4. Save Overrides
 async function saveOverride(dateKey, shiftName) {
     if (shiftName === 'Off') {
         await supabase.from('shift_overrides').delete().eq('shift_date', dateKey);
@@ -102,7 +130,19 @@ async function saveOverride(dateKey, shiftName) {
     initCalendar(currentViewDate);
 }
 
-// Navigation...
+// 5. Navigation & Sync
+document.getElementById('prevMonth').onclick = () => {
+    currentViewDate.setMonth(currentViewDate.getMonth() - 1);
+    initCalendar(currentViewDate);
+};
+
+document.getElementById('nextMonth').onclick = () => {
+    currentViewDate.setMonth(currentViewDate.getMonth() + 1);
+    initCalendar(currentViewDate);
+};
+
+document.getElementById('closePickerBtn').onclick = closePicker;
+
 document.getElementById('fetchBtn').innerText = "Sync to iCloud";
 document.getElementById('fetchBtn').onclick = async () => {
     const fetchBtn = document.getElementById('fetchBtn');
@@ -129,4 +169,5 @@ document.getElementById('fetchBtn').onclick = async () => {
     }
 };
 
+// Start
 initCalendar(currentViewDate);
