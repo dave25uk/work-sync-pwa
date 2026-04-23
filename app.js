@@ -57,18 +57,41 @@ async function initCalendar(date) {
 }
 
 async function loadOverrides(year, month) {
-    const m = (month + 1).toString().padStart(2, '0');
-    const { data, error } = await supabase.from('shift_overrides').select('*').ilike('shift_date', `${year}-${m}-%`);
+    const displayMonth = (month + 1).toString().padStart(2, '0');
+    
+    // Define the first and last day of the month for a strict range query
+    const firstDay = `${year}-${displayMonth}-01`;
+    const lastDay = `${year}-${displayMonth}-${new Date(year, month + 1, 0).getDate()}`;
+
+    // Switch from .ilike() to .gte() and .lte() (Greater than or equal to / Less than or equal to)
+    const { data, error } = await supabase
+        .from('shift_overrides')
+        .select('*')
+        .gte('shift_date', firstDay)
+        .lte('shift_date', lastDay);
+
+    if (error) {
+        console.error("Supabase Query Error:", error);
+        return;
+    }
 
     if (data) {
         data.forEach(entry => {
+            // Find the element on the page
             const el = document.getElementById(`shift-display-${entry.shift_date}`);
             if (el) {
                 const isOff = entry.shift_name === 'Off';
                 el.innerText = formatShiftDisplay(entry.shift_name);
+                
+                // Styling
                 el.classList.remove('opacity-30');
-                el.classList.add(isOff ? 'text-slate-300' : 'text-blue-600');
-                console.log(`Loaded override for ${entry.shift_date}: ${entry.shift_name}`);
+                if (isOff) {
+                    el.classList.add('text-slate-300');
+                    el.classList.remove('text-blue-600');
+                } else {
+                    el.classList.add('text-blue-600');
+                    el.classList.remove('text-slate-300');
+                }
             }
         });
     }
