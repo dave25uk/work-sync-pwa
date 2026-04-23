@@ -18,7 +18,6 @@ const SHIFTS = [
     'Dave Work (M1)', 'Annual Leave', 'Off'
 ];
 
-// State
 let currentViewDate = new Date(2026, 3, 1);
 const calendarEl = document.getElementById('calendar');
 const monthLabel = document.getElementById('currentMonthLabel');
@@ -72,16 +71,19 @@ async function initCalendar(date) {
         dayCard.onclick = () => openPicker(year, month, i);
         calendarEl.appendChild(dayCard);
     }
-    loadOverrides(year, month);
+    // Pull overrides from DB after drawing the pattern
+    await loadOverrides(year, month);
 }
 
-// 2. Load Overrides (Annual Leave, etc)
+// 2. Load Overrides
 async function loadOverrides(year, month) {
     const displayMonth = (month + 1).toString().padStart(2, '0');
-    const { data } = await supabase
+    const { data, error } = await supabase
         .from('shift_overrides')
         .select('*')
         .ilike('shift_date', `${year}-${displayMonth}-%`);
+
+    if (error) console.error("Load Overrides Error:", error);
 
     if (data) {
         data.forEach(entry => {
@@ -122,15 +124,20 @@ function closePicker() {
 
 // 4. Save Overrides
 async function saveOverride(dateKey, shiftName) {
-    if (shiftName === 'Off') {
-        await supabase.from('shift_overrides').delete().eq('shift_date', dateKey);
-    } else {
-        await supabase.from('shift_overrides').upsert({ shift_date: dateKey, shift_name: shiftName });
+    try {
+        if (shiftName === 'Off') {
+            await supabase.from('shift_overrides').delete().eq('shift_date', dateKey);
+        } else {
+            await supabase.from('shift_overrides').upsert({ shift_date: dateKey, shift_name: shiftName });
+        }
+        // Force a re-init to refresh the display
+        await initCalendar(currentViewDate);
+    } catch (err) {
+        console.error("Save Error:", err);
     }
-    initCalendar(currentViewDate);
 }
 
-// 5. Navigation & Sync
+// 5. Navigation
 document.getElementById('prevMonth').onclick = () => {
     currentViewDate.setMonth(currentViewDate.getMonth() - 1);
     initCalendar(currentViewDate);
@@ -143,7 +150,6 @@ document.getElementById('nextMonth').onclick = () => {
 
 document.getElementById('closePickerBtn').onclick = closePicker;
 
-document.getElementById('fetchBtn').innerText = "Sync to iCloud";
 document.getElementById('fetchBtn').onclick = async () => {
     const fetchBtn = document.getElementById('fetchBtn');
     const originalText = fetchBtn.innerText;
@@ -161,13 +167,12 @@ document.getElementById('fetchBtn').onclick = async () => {
         if (error) throw error;
         alert('iCloud Updated Successfully!');
     } catch (err) {
-        console.error(err);
-        alert('Sync failed. Check console.');
+        console.error("Sync Error:", err);
+        alert('Sync failed. Check Supabase logs.');
     } finally {
         fetchBtn.innerText = originalText;
         fetchBtn.disabled = false;
     }
 };
 
-// Start
 initCalendar(currentViewDate);
