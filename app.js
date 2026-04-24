@@ -95,12 +95,17 @@ async function loadOverrides(year, month, isMonthSynced) {
             if (el) {
                 el.innerText = formatShiftDisplay(entry.shift_name);
                 
-                // 1. Remove all previous color/opacity classes to reset the state
+                // Clear out pattern classes (Grey or Blue)
                 el.classList.remove('opacity-30', 'text-slate-400', 'text-blue-600', 'text-slate-300');
                 
-                // 2. Apply Orange for ALL overrides (Standard Overrides)
+                // Set to Solid Orange for all overrides
                 el.classList.add('opacity-100', 'text-orange-500');
-               
+                
+                // If it's an "Off" day, we still want it muted so it doesn't 
+                // draw as much attention as a work day
+                if (entry.shift_name === 'Off') {
+                    el.classList.replace('text-orange-500', 'text-slate-300');
+                }
             }
         });
     }
