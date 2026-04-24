@@ -25,6 +25,8 @@ function getPatternShift(dateString) {
 function formatShiftDisplay(fullTitle) {
     if (!fullTitle || fullTitle === 'Off' || fullTitle === '-') return '-';
     if (fullTitle === 'Annual Leave') return 'AL';
+    if (fullTitle === 'Dave Work (Overtime)') return 'OT';
+    if (fullTitle === 'Dave Work (Z)') return 'Z';
     const match = fullTitle.match(/\((.*?)\)/);
     return match ? match[1] : fullTitle;
 }
@@ -123,6 +125,7 @@ function openPicker(year, month, day) {
     const optionsGrid = document.getElementById('optionsGrid');
     optionsGrid.innerHTML = '';
 
+    // Standard Buttons
     SHIFTS.forEach(shift => {
         const btn = document.createElement('button');
         btn.className = "bg-slate-50 border border-slate-100 py-4 px-2 rounded-xl text-[10px] font-bold text-slate-700 active:bg-blue-600 active:text-white transition-all";
@@ -133,6 +136,45 @@ function openPicker(year, month, day) {
         };
         optionsGrid.appendChild(btn);
     });
+
+    // Custom Shift Section
+    const customDiv = document.createElement('div');
+    customDiv.className = "col-span-3 mt-4 p-4 bg-slate-100 rounded-xl flex flex-col gap-3";
+    customDiv.innerHTML = `
+        <p class="text-[10px] font-bold text-slate-500 uppercase">Custom Shift</p>
+        <div class="flex gap-2">
+            <input type="time" id="customStart" class="flex-1 p-2 rounded-lg border-none text-sm">
+            <input type="time" id="customEnd" class="flex-1 p-2 rounded-lg border-none text-sm">
+        </div>
+        <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="isOvertime" class="rounded text-blue-600">
+            <span class="text-[12px] font-bold text-slate-700">Mark as Overtime</span>
+        </label>
+        <button id="saveCustomBtn" class="bg-blue-600 text-white py-3 rounded-lg font-bold text-sm">Save Custom Shift</button>
+    `;
+    optionsGrid.appendChild(customDiv);
+
+    document.getElementById('saveCustomBtn').onclick = async () => {
+        const start = document.getElementById('customStart').value;
+        const end = document.getElementById('customEnd').value;
+        const isOT = document.getElementById('isOvertime').checked;
+        
+        if (!start || !end) return alert("Please set both times");
+
+        const shiftName = isOT ? 'Dave Work (Overtime)' : 'Dave Work (Z)';
+        
+        await supabase.from('shift_overrides').upsert({ 
+            shift_date: dateKey, 
+            shift_name: shiftName,
+            custom_start_time: start,
+            custom_end_time: end,
+            is_overtime: isOT
+        });
+
+        document.getElementById('shiftPicker').classList.add('hidden');
+        await initCalendar(currentViewDate);
+    };
+
     document.getElementById('shiftPicker').classList.remove('hidden');
     document.getElementById('shiftPicker').classList.add('flex');
 }
