@@ -8,7 +8,10 @@ const ANCHOR_DATE = new Date("2026-04-02T12:00:00");
 const PATTERN = ["Dave Work (M)", "Dave Work (M)", "Dave Work (M)", "Dave Work (A)", "Dave Work (A)", "Dave Work (A)", null, null, null];
 const SHIFTS = ['Dave Work (M)', 'Dave Work (A)', 'Dave Work (D1)', 'Dave Work (D4)', 'Dave Work (A1)', 'Dave Work (A2)', 'Dave Work (M1)', 'Annual Leave', 'Off'];
 
-let currentViewDate = new Date(2026, 3, 1);
+// Start at current month instead of a fixed date
+let currentViewDate = new Date();
+currentViewDate.setDate(1); 
+
 const calendarEl = document.getElementById('calendar');
 const monthLabel = document.getElementById('currentMonthLabel');
 
@@ -31,6 +34,16 @@ async function initCalendar(date) {
     const month = date.getMonth();
     monthLabel.innerText = `${new Intl.DateTimeFormat('en-US', { month: 'long' }).format(date)} ${year}`;
 
+    // 1. Check if this month has been synced
+    const { data: syncData } = await supabase
+        .from('sync_history')
+        .select('*')
+        .eq('year', year)
+        .eq('month', month)
+        .single();
+
+    const isMonthSynced = !!syncData;
+
     const firstDay = new Date(year, month, 1).getDay(); 
     const startingPoint = firstDay === 0 ? 6 : firstDay - 1; 
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -44,53 +57,54 @@ async function initCalendar(date) {
         
         const dayCard = document.createElement('div');
         dayCard.className = "day-card bg-white border border-slate-200 rounded-xl p-1.5 min-h-[85px] flex flex-col justify-between cursor-pointer";
+        
+        // Base styling logic: 
+        // If synced -> text-blue-600, full opacity
+        // If not synced -> text-slate-400 (grey), low opacity (opacity-30)
+        const colorClass = isMonthSynced ? 'text-blue-600' : 'text-slate-400';
+        const opacityClass = isMonthSynced ? 'opacity-100' : 'opacity-30';
+
         dayCard.innerHTML = `
             <span class="text-[10px] font-bold text-slate-400">${i}</span>
-            <div class="text-[15px] font-black text-center uppercase opacity-30" id="shift-display-${dateKey}">
+            <div class="text-[15px] font-black text-center uppercase ${colorClass} ${opacityClass}" id="shift-display-${dateKey}">
                 ${formatShiftDisplay(patternShift)}
             </div>
         `;
         dayCard.onclick = () => openPicker(year, month, i);
         calendarEl.appendChild(dayCard);
     }
-    await loadOverrides(year, month);
+    await loadOverrides(year, month, isMonthSynced);
 }
 
-async function loadOverrides(year, month) {
+async function loadOverrides(year, month, isMonthSynced) {
     const displayMonth = (month + 1).toString().padStart(2, '0');
-    
-    // Define the first and last day of the month for a strict range query
     const firstDay = `${year}-${displayMonth}-01`;
     const lastDay = `${year}-${displayMonth}-${new Date(year, month + 1, 0).getDate()}`;
 
-    // Switch from .ilike() to .gte() and .lte() (Greater than or equal to / Less than or equal to)
     const { data, error } = await supabase
         .from('shift_overrides')
         .select('*')
         .gte('shift_date', firstDay)
         .lte('shift_date', lastDay);
 
-    if (error) {
-        console.error("Supabase Query Error:", error);
-        return;
-    }
+    if (error) return console.error("Supabase Query Error:", error);
 
     if (data) {
         data.forEach(entry => {
-            // Find the element on the page
             const el = document.getElementById(`shift-display-${entry.shift_date}`);
             if (el) {
-                const isOff = entry.shift_name === 'Off';
                 el.innerText = formatShiftDisplay(entry.shift_name);
                 
-                // Styling
-                el.classList.remove('opacity-30');
-                if (isOff) {
+                // If month is synced, everything stays blue.
+                // If not synced, overrides turn blue (active) while pattern stays grey.
+                if (!isMonthSynced) {
+                    el.classList.remove('opacity-30', 'text-slate-400');
+                    el.classList.add('opacity-100', 'text-blue-600');
+                }
+                
+                if (entry.shift_name === 'Off') {
                     el.classList.add('text-slate-300');
                     el.classList.remove('text-blue-600');
-                } else {
-                    el.classList.add('text-blue-600');
-                    el.classList.remove('text-slate-300');
                 }
             }
         });
@@ -98,7 +112,6 @@ async function loadOverrides(year, month) {
 }
 
 async function saveOverride(dateKey, shiftName) {
-    // ALWAYS upsert so "Off" is recorded and doesn't revert to pattern
     const { error } = await supabase.from('shift_overrides').upsert({ shift_date: dateKey, shift_name: shiftName });
     if (error) console.error("Database Error:", error);
     await initCalendar(currentViewDate);
@@ -124,17 +137,35 @@ function openPicker(year, month, day) {
     document.getElementById('shiftPicker').classList.add('flex');
 }
 
-document.getElementById('prevMonth').onclick = () => { currentViewDate.setMonth(currentViewDate.getMonth() - 1); initCalendar(currentViewDate); };
-document.getElementById('nextMonth').onclick = () => { currentViewDate.setMonth(currentViewDate.getMonth() + 1); initCalendar(currentViewDate); };
+// Fixed navigation logic for unlimited months
+document.getElementById('prevMonth').onclick = () => { 
+    currentViewDate.setMonth(currentViewDate.getMonth() - 1); 
+    initCalendar(currentViewDate); 
+};
+document.getElementById('nextMonth').onclick = () => { 
+    currentViewDate.setMonth(currentViewDate.getMonth() + 1); 
+    initCalendar(currentViewDate); 
+};
+
 document.getElementById('closePickerBtn').onclick = () => document.getElementById('shiftPicker').classList.add('hidden');
 
 document.getElementById('fetchBtn').onclick = async () => {
     const btn = document.getElementById('fetchBtn');
+    const year = currentViewDate.getFullYear();
+    const month = currentViewDate.getMonth();
+    
     btn.innerText = 'Syncing...';
     try {
-        await supabase.functions.invoke('sync-to-icloud', { body: { year: currentViewDate.getFullYear(), month: currentViewDate.getMonth() } });
+        await supabase.functions.invoke('sync-to-icloud', { body: { year, month } });
+        
+        // Record the sync in history
+        await supabase.from('sync_history').upsert({ year, month, last_synced_at: new Date().toISOString() });
+        
         alert('iCloud Sync Request Sent!');
-    } catch (e) { alert('Sync Error'); }
+        await initCalendar(currentViewDate); // Refresh UI to turn everything blue
+    } catch (e) { 
+        alert('Sync Error'); 
+    }
     btn.innerText = 'Sync to iCloud';
 };
 
