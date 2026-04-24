@@ -95,17 +95,12 @@ async function loadOverrides(year, month, isMonthSynced) {
             if (el) {
                 el.innerText = formatShiftDisplay(entry.shift_name);
                 
-                // If month is synced, everything stays blue.
-                // If not synced, overrides turn blue (active) while pattern stays grey.
-                if (!isMonthSynced) {
-                    el.classList.remove('opacity-30', 'text-slate-400');
-                    el.classList.add('opacity-100', 'text-blue-600');
-                }
+                // 1. Remove all previous color/opacity classes to reset the state
+                el.classList.remove('opacity-30', 'text-slate-400', 'text-blue-600', 'text-slate-300');
                 
-                if (entry.shift_name === 'Off') {
-                    el.classList.add('text-slate-300');
-                    el.classList.remove('text-blue-600');
-                }
+                // 2. Apply Orange for ALL overrides (Standard Overrides)
+                el.classList.add('opacity-100', 'text-orange-500');
+               
             }
         });
     }
