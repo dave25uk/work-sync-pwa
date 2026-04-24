@@ -21,7 +21,7 @@ function getPatternShift(dateString) {
 
 function formatShiftDisplay(fullTitle) {
     if (!fullTitle || fullTitle === 'Off' || fullTitle === '-') return '-';
-    if (fullTitle === 'Annual Leave') return '🌴';
+    if (fullTitle === 'Annual Leave') return 'AL';
     const match = fullTitle.match(/\((.*?)\)/);
     return match ? match[1] : fullTitle;
 }
