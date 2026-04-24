@@ -26,7 +26,7 @@ function formatShiftDisplay(fullTitle) {
     if (!fullTitle || fullTitle === 'Off' || fullTitle === '-') return '-';
     if (fullTitle === 'Annual Leave') return 'AL';
     if (fullTitle === 'Dave Work (Overtime)') return 'OT';
-    if (fullTitle === 'Dave Work (Z)') return 'Z';
+    if (fullTitle === 'Dave Work (D)') return 'D';
     const match = fullTitle.match(/\((.*?)\)/);
     return match ? match[1] : fullTitle;
 }
