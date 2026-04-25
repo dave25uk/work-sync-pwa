@@ -26,7 +26,7 @@ function formatShiftDisplay(fullTitle) {
     if (!fullTitle || fullTitle === 'Off' || fullTitle === '-') return '-';
     if (fullTitle === 'Annual Leave') return 'AL';
     if (fullTitle === 'Dave Work (Overtime)') return 'OT';
-    if (fullTitle === 'Dave Work (D)') return 'D';
+    if (fullTitle === 'Dave Work (D)') return 'D'; // Standardized to D
     const match = fullTitle.match(/\((.*?)\)/);
     return match ? match[1] : fullTitle;
 }
@@ -161,7 +161,7 @@ function openPicker(year, month, day) {
         
         if (!start || !end) return alert("Please set both times");
 
-        const shiftName = isOT ? 'Dave Work (Overtime)' : 'Dave Work (Z)';
+        const shiftName = isOT ? 'Dave Work (Overtime)' : 'Dave Work (D)';
         
         await supabase.from('shift_overrides').upsert({ 
             shift_date: dateKey, 
