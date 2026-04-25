@@ -36,7 +36,6 @@ async function initCalendar(date) {
     const month = date.getMonth();
     monthLabel.innerText = `${new Intl.DateTimeFormat('en-US', { month: 'long' }).format(date)} ${year}`;
 
-    // 1. Check if this month has been synced
     const { data: syncData } = await supabase
         .from('sync_history')
         .select('*')
@@ -45,7 +44,6 @@ async function initCalendar(date) {
         .single();
 
     const isMonthSynced = !!syncData;
-
     const firstDay = new Date(year, month, 1).getDay(); 
     const startingPoint = firstDay === 0 ? 6 : firstDay - 1; 
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -57,12 +55,13 @@ async function initCalendar(date) {
         const dateKey = `${year}-${(month + 1).toString().padStart(2, '0')}-${i.toString().padStart(2, '0')}`;
         const patternShift = getPatternShift(dateKey);
         
-        const dayCard = document.createElement('div');
-        dayCard.className = "day-card bg-white border border-slate-200 rounded-xl p-1.5 min-h-[85px] flex flex-col justify-between cursor-pointer";
+        // Determine if it's a work day to apply the subtle background
+        const isWork = patternShift && patternShift !== 'Off' && patternShift !== 'Annual Leave';
+        const bgClass = isWork ? 'bg-slate-50/80' : 'bg-white';
         
-        // Base styling logic: 
-        // If synced -> text-blue-600, full opacity
-        // If not synced -> text-slate-400 (grey), low opacity (opacity-30)
+        const dayCard = document.createElement('div');
+        dayCard.className = `day-card ${bgClass} border border-slate-200 rounded-xl p-1.5 min-h-[85px] flex flex-col justify-between cursor-pointer`;
+        
         const colorClass = isMonthSynced ? 'text-blue-600' : 'text-slate-400';
         const opacityClass = isMonthSynced ? 'opacity-100' : 'opacity-30';
 
@@ -83,28 +82,39 @@ async function loadOverrides(year, month, isMonthSynced) {
     const firstDay = `${year}-${displayMonth}-01`;
     const lastDay = `${year}-${displayMonth}-${new Date(year, month + 1, 0).getDate()}`;
 
-    const { data, error } = await supabase
+    const { data } = await supabase
         .from('shift_overrides')
         .select('*')
         .gte('shift_date', firstDay)
         .lte('shift_date', lastDay);
 
-    if (error) return console.error("Supabase Query Error:", error);
-
     if (data) {
         data.forEach(entry => {
             const el = document.getElementById(`shift-display-${entry.shift_date}`);
-            if (el) {
+            const card = el?.closest('.day-card');
+            
+            if (el && card) {
                 el.innerText = formatShiftDisplay(entry.shift_name);
                 
-                // Clear out pattern classes (Grey or Blue)
-                el.classList.remove('opacity-30', 'text-slate-400', 'text-blue-600', 'text-slate-300');
+                // Reset background based on the new shift name
+                const isWork = entry.shift_name && entry.shift_name !== 'Off' && entry.shift_name !== 'Annual Leave';
                 
-                // Set to Solid Orange for all overrides
+                if (isWork) {
+                    card.classList.replace('bg-white', 'bg-slate-50/80');
+                } else {
+                    card.classList.replace('bg-slate-50/80', 'bg-white');
+                }
+
+                // Text Styling
+                el.classList.remove('opacity-30', 'text-slate-400', 'text-blue-600', 'font-black');
                 el.classList.add('opacity-100', 'text-orange-500');
-                
-                // If it's an "Off" day, we still want it muted so it doesn't 
-                // draw as much attention as a work day
+
+                // If it's AL, keep orange but don't add back the font-black
+                // For other working overrides (like D or OT), we add bold back for visibility
+                if (entry.shift_name !== 'Annual Leave' && entry.shift_name !== 'Off') {
+                    el.classList.add('font-black');
+                }
+
                 if (entry.shift_name === 'Off') {
                     el.classList.replace('text-orange-500', 'text-slate-300');
                 }
