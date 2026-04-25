@@ -55,13 +55,12 @@ async function initCalendar(date) {
         const dateKey = `${year}-${(month + 1).toString().padStart(2, '0')}-${i.toString().padStart(2, '0')}`;
         const patternShift = getPatternShift(dateKey);
         
-        // Define colors
+        // Logic for working day background
         const isWork = patternShift && patternShift !== 'Off' && patternShift !== 'Annual Leave';
-        // Using a light blue tint to distinguish work days from the slate background
-        const bgClass = isWork ? 'bg-blue-50/60' : 'bg-white';
+        const bgClass = isWork ? 'bg-amber-50/70' : 'bg-white';
         
         const dayCard = document.createElement('div');
-        dayCard.className = `day-card ${bgClass} border border-slate-200 rounded-xl p-1.5 min-h-[85px] flex flex-col justify-between cursor-pointer shadow-sm`;
+        dayCard.className = `day-card ${bgClass} border border-slate-200 rounded-xl p-1.5 min-h-[85px] flex flex-col justify-between cursor-pointer shadow-sm transition-colors duration-200`;
         
         const colorClass = isMonthSynced ? 'text-blue-600' : 'text-slate-400';
         const opacityClass = isMonthSynced ? 'opacity-100' : 'opacity-30';
@@ -97,18 +96,17 @@ async function loadOverrides(year, month, isMonthSynced) {
             if (el && card) {
                 el.innerText = formatShiftDisplay(entry.shift_name);
                 
-                // Dynamic Background Update
+                // Update background dynamically based on the override
                 const isWork = entry.shift_name && entry.shift_name !== 'Off' && entry.shift_name !== 'Annual Leave';
                 
-                // Reset card classes
-                card.classList.remove('bg-blue-50/60', 'bg-white');
-                card.classList.add(isWork ? 'bg-blue-50/60' : 'bg-white');
+                card.classList.remove('bg-amber-50/70', 'bg-white');
+                card.classList.add(isWork ? 'bg-amber-50/70' : 'bg-white');
 
                 // Text Styling
                 el.classList.remove('opacity-30', 'text-slate-400', 'text-blue-600', 'font-black');
                 el.classList.add('opacity-100', 'text-orange-500');
 
-                // Apply bold only to non-AL work shifts
+                // Maintain Bold for working overrides (D, OT, M, A) but leave AL regular
                 if (entry.shift_name !== 'Annual Leave' && entry.shift_name !== 'Off') {
                     el.classList.add('font-black');
                 }
