@@ -8,7 +8,6 @@ const ANCHOR_DATE = new Date("2026-04-02T12:00:00");
 const PATTERN = ["Dave Work (M)", "Dave Work (M)", "Dave Work (M)", "Dave Work (A)", "Dave Work (A)", "Dave Work (A)", null, null, null];
 const SHIFTS = ['Dave Work (M)', 'Dave Work (A)', 'Dave Work (D1)', 'Dave Work (D4)', 'Dave Work (A1)', 'Dave Work (A2)', 'Dave Work (M1)', 'Annual Leave', 'Off'];
 
-// Start at current month instead of a fixed date
 let currentViewDate = new Date();
 currentViewDate.setDate(1); 
 
@@ -26,7 +25,7 @@ function formatShiftDisplay(fullTitle) {
     if (!fullTitle || fullTitle === 'Off' || fullTitle === '-') return '-';
     if (fullTitle === 'Annual Leave') return 'AL';
     if (fullTitle === 'Dave Work (Overtime)') return 'OT';
-    if (fullTitle === 'Dave Work (D)') return 'D'; // Standardized to D
+    if (fullTitle === 'Dave Work (D)') return 'D';
     const match = fullTitle.match(/\((.*?)\)/);
     return match ? match[1] : fullTitle;
 }
@@ -48,25 +47,48 @@ async function initCalendar(date) {
     const startingPoint = firstDay === 0 ? 6 : firstDay - 1; 
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     
+    // Get today's date for highlighting
+    const now = new Date();
+    const todayKey = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
+    
     calendarEl.innerHTML = '';
-    for (let x = 0; x < startingPoint; x++) calendarEl.appendChild(document.createElement('div'));
+
+    // Add empty slots with weekend tinting
+    for (let x = 0; x < startingPoint; x++) {
+        const spacer = document.createElement('div');
+        if (x === 5 || x === 6) spacer.className = "weekend-col";
+        calendarEl.appendChild(spacer);
+    }
 
     for (let i = 1; i <= daysInMonth; i++) {
         const dateKey = `${year}-${(month + 1).toString().padStart(2, '0')}-${i.toString().padStart(2, '0')}`;
         const patternShift = getPatternShift(dateKey);
         
-        // Logic for working day background
+        const dayOfWeek = (i + startingPoint - 1) % 7;
+        const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
+        const isToday = dateKey === todayKey;
         const isWork = patternShift && patternShift !== 'Off' && patternShift !== 'Annual Leave';
-        const bgClass = isWork ? 'bg-amber-50/70' : 'bg-white';
-        
+
         const dayCard = document.createElement('div');
-        dayCard.className = `day-card ${bgClass} border border-slate-200 rounded-xl p-1.5 min-h-[85px] flex flex-col justify-between cursor-pointer shadow-sm transition-colors duration-200`;
+        
+        let classes = ["day-card", "border", "rounded-xl", "p-1.5", "min-h-[85px]", "flex", "flex-col", "justify-between", "cursor-pointer", "shadow-sm", "transition-all", "duration-200"];
+        
+        if (isToday) classes.push("today-card");
+        if (isWeekend) classes.push("weekend-col");
+        
+        if (isWork) {
+            classes.push("bg-amber-50/70", "border-amber-100");
+        } else {
+            classes.push("bg-white", "border-slate-200");
+        }
+
+        dayCard.className = classes.join(" ");
         
         const colorClass = isMonthSynced ? 'text-blue-600' : 'text-slate-400';
         const opacityClass = isMonthSynced ? 'opacity-100' : 'opacity-30';
 
         dayCard.innerHTML = `
-            <span class="text-[10px] font-bold text-slate-400">${i}</span>
+            <span class="text-[10px] font-bold ${isToday ? 'text-blue-600' : 'text-slate-400'}">${i}</span>
             <div class="text-[15px] font-black text-center uppercase ${colorClass} ${opacityClass}" id="shift-display-${dateKey}">
                 ${formatShiftDisplay(patternShift)}
             </div>
@@ -96,17 +118,15 @@ async function loadOverrides(year, month, isMonthSynced) {
             if (el && card) {
                 el.innerText = formatShiftDisplay(entry.shift_name);
                 
-                // Update background dynamically based on the override
                 const isWork = entry.shift_name && entry.shift_name !== 'Off' && entry.shift_name !== 'Annual Leave';
                 
+                // Keep the border and weekend tinting but swap the core background
                 card.classList.remove('bg-amber-50/70', 'bg-white');
                 card.classList.add(isWork ? 'bg-amber-50/70' : 'bg-white');
 
-                // Text Styling
                 el.classList.remove('opacity-30', 'text-slate-400', 'text-blue-600', 'font-black');
                 el.classList.add('opacity-100', 'text-orange-500');
 
-                // Maintain Bold for working overrides (D, OT, M, A) but leave AL regular
                 if (entry.shift_name !== 'Annual Leave' && entry.shift_name !== 'Off') {
                     el.classList.add('font-black');
                 }
@@ -118,6 +138,30 @@ async function loadOverrides(year, month, isMonthSynced) {
         });
     }
 }
+
+// Swipe Support Implementation
+let touchstartX = 0;
+let touchendX = 0;
+
+function handleGesture() {
+    const threshold = 70;
+    if (touchendX < touchstartX - threshold) {
+        document.getElementById('nextMonth').click();
+    }
+    if (touchendX > touchstartX + threshold) {
+        document.getElementById('prevMonth').click();
+    }
+}
+
+calendarEl.addEventListener('touchstart', e => {
+    touchstartX = e.changedTouches[0].screenX;
+}, {passive: true});
+
+calendarEl.addEventListener('touchend', e => {
+    touchendX = e.changedTouches[0].screenX;
+    handleGesture();
+}, {passive: true});
+
 
 async function saveOverride(dateKey, shiftName) {
     const { error } = await supabase.from('shift_overrides').upsert({ shift_date: dateKey, shift_name: shiftName });
@@ -131,7 +175,6 @@ function openPicker(year, month, day) {
     const optionsGrid = document.getElementById('optionsGrid');
     optionsGrid.innerHTML = '';
 
-    // Standard Buttons
     SHIFTS.forEach(shift => {
         const btn = document.createElement('button');
         btn.className = "bg-slate-50 border border-slate-100 py-4 px-2 rounded-xl text-[10px] font-bold text-slate-700 active:bg-blue-600 active:text-white transition-all";
@@ -143,7 +186,6 @@ function openPicker(year, month, day) {
         optionsGrid.appendChild(btn);
     });
 
-    // Custom Shift Section
     const customDiv = document.createElement('div');
     customDiv.className = "col-span-3 mt-4 p-4 bg-slate-100 rounded-xl flex flex-col gap-3";
     customDiv.innerHTML = `
@@ -164,11 +206,8 @@ function openPicker(year, month, day) {
         const start = document.getElementById('customStart').value;
         const end = document.getElementById('customEnd').value;
         const isOT = document.getElementById('isOvertime').checked;
-        
         if (!start || !end) return alert("Please set both times");
-
         const shiftName = isOT ? 'Dave Work (Overtime)' : 'Dave Work (D)';
-        
         await supabase.from('shift_overrides').upsert({ 
             shift_date: dateKey, 
             shift_name: shiftName,
@@ -176,7 +215,6 @@ function openPicker(year, month, day) {
             custom_end_time: end,
             is_overtime: isOT
         });
-
         document.getElementById('shiftPicker').classList.add('hidden');
         await initCalendar(currentViewDate);
     };
@@ -185,7 +223,6 @@ function openPicker(year, month, day) {
     document.getElementById('shiftPicker').classList.add('flex');
 }
 
-// Fixed navigation logic for unlimited months
 document.getElementById('prevMonth').onclick = () => { 
     currentViewDate.setMonth(currentViewDate.getMonth() - 1); 
     initCalendar(currentViewDate); 
@@ -201,16 +238,12 @@ document.getElementById('fetchBtn').onclick = async () => {
     const btn = document.getElementById('fetchBtn');
     const year = currentViewDate.getFullYear();
     const month = currentViewDate.getMonth();
-    
     btn.innerText = 'Syncing...';
     try {
         await supabase.functions.invoke('sync-to-icloud', { body: { year, month } });
-        
-        // Record the sync in history
         await supabase.from('sync_history').upsert({ year, month, last_synced_at: new Date().toISOString() });
-        
         alert('iCloud Sync Request Sent!');
-        await initCalendar(currentViewDate); // Refresh UI to turn everything blue
+        await initCalendar(currentViewDate);
     } catch (e) { 
         alert('Sync Error'); 
     }
