@@ -53,29 +53,39 @@ async function initCalendar(date) {
     
     calendarEl.innerHTML = '';
 
-    // Add empty slots with weekend tinting
+    // Add empty slots
     for (let x = 0; x < startingPoint; x++) {
         const spacer = document.createElement('div');
-        if (x === 5 || x === 6) spacer.className = "weekend-col";
         calendarEl.appendChild(spacer);
     }
 
+    // Build the day cards
     for (let i = 1; i <= daysInMonth; i++) {
         const dateKey = `${year}-${(month + 1).toString().padStart(2, '0')}-${i.toString().padStart(2, '0')}`;
         const patternShift = getPatternShift(dateKey);
         
+        // Calculate day of week (0=Mon, 5=Sat, 6=Sun)
         const dayOfWeek = (i + startingPoint - 1) % 7;
         const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
         const isToday = dateKey === todayKey;
         const isWork = patternShift && patternShift !== 'Off' && patternShift !== 'Annual Leave';
 
+        // Determine the class for the date number (i)
+        let dateClass = "text-slate-400 font-semibold"; // Default
+        if (isToday) {
+            dateClass = "text-blue-600 font-bold"; 
+        } else if (isWeekend) {
+            dateClass = "text-slate-900 font-black"; // Bold black for Sat/Sun
+        }
+
         const dayCard = document.createElement('div');
         
+        // Base classes for the card
         let classes = ["day-card", "border", "rounded-xl", "p-1.5", "min-h-[85px]", "flex", "flex-col", "justify-between", "cursor-pointer", "shadow-sm", "transition-all", "duration-200"];
         
         if (isToday) classes.push("today-card");
-        if (isWeekend) classes.push("weekend-col");
         
+        // Background logic (Amber for work, White for off)
         if (isWork) {
             classes.push("bg-amber-50/70", "border-amber-100");
         } else {
@@ -88,7 +98,7 @@ async function initCalendar(date) {
         const opacityClass = isMonthSynced ? 'opacity-100' : 'opacity-30';
 
         dayCard.innerHTML = `
-            <span class="text-[10px] font-bold ${isToday ? 'text-blue-600' : 'text-slate-400'}">${i}</span>
+            <span class="text-[10px] ${dateClass} tracking-wide">${i}</span>
             <div class="text-[15px] font-black text-center uppercase ${colorClass} ${opacityClass}" id="shift-display-${dateKey}">
                 ${formatShiftDisplay(patternShift)}
             </div>
